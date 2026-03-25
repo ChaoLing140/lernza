@@ -6,6 +6,13 @@ use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, 
 // Other contracts (milestone, rewards) reference quest IDs and owners.
 
 #[contracttype]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Visibility {
+    Public = 0,
+    Private = 1,
+}
+
+#[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
     NextId,
@@ -22,6 +29,7 @@ pub struct QuestInfo {
     pub description: String,
     pub token_addr: Address,
     pub created_at: u64,
+    pub visibility: Visibility,
 }
 
 #[contracterror]
@@ -50,6 +58,7 @@ impl QuestContract {
         name: String,
         description: String,
         token_addr: Address,
+        visibility: Visibility,
     ) -> Result<u32, Error> {
         owner.require_auth();
 
@@ -57,11 +66,12 @@ impl QuestContract {
 
         let quest = QuestInfo {
             id,
-            owner: owner.clone(),
+            owner,
             name,
             description,
             token_addr,
             created_at: env.ledger().timestamp(),
+            visibility,
         };
 
         env.storage().persistent().set(&DataKey::Quest(id), &quest);
@@ -79,19 +89,22 @@ impl QuestContract {
         let quest = Self::load_quest(&env, quest_id)?;
         quest.owner.require_auth();
 
-        let mut enrollees = Self::load_enrollees(&env, quest_id);
+        let enrollees = Self::load_enrollees(&env, quest_id);
 
         // Check not already enrolled
         for i in 0..enrollees.len() {
-            if enrollees.get(i).unwrap() == enrollee {
-                return Err(Error::AlreadyEnrolled);
+            if let Some(existing) = enrollees.get(i) {
+                if existing == enrollee {
+                    return Err(Error::AlreadyEnrolled);
+                }
             }
         }
 
-        enrollees.push_back(enrollee);
+        let mut new_enrollees = enrollees;
+        new_enrollees.push_back(enrollee);
         env.storage()
             .persistent()
-            .set(&DataKey::Enrollees(quest_id), &enrollees);
+            .set(&DataKey::Enrollees(quest_id), &new_enrollees);
         Self::bump(&env, quest_id);
         Ok(())
     }
@@ -102,8 +115,8 @@ impl QuestContract {
         quest.owner.require_auth();
 
         let enrollees = Self::load_enrollees(&env, quest_id);
-        let mut found = false;
         let mut new_list = Vec::new(&env);
+        let mut found = false;
 
         for i in 0..enrollees.len() {
             let addr = enrollees.get(i).unwrap();
@@ -145,8 +158,10 @@ impl QuestContract {
         Self::load_quest(&env, quest_id)?;
         let enrollees = Self::load_enrollees(&env, quest_id);
         for i in 0..enrollees.len() {
-            if enrollees.get(i).unwrap() == user {
-                return Ok(true);
+            if let Some(enrollee) = enrollees.get(i) {
+                if enrollee == user {
+                    return Ok(true);
+                }
             }
         }
         Ok(false)
@@ -155,6 +170,36 @@ impl QuestContract {
     /// Get total quest count.
     pub fn get_quest_count(env: Env) -> u32 {
         env.storage().instance().get(&DataKey::NextId).unwrap_or(0)
+    }
+
+    /// Set visibility of a quest. Owner only.
+    pub fn set_visibility(env: Env, quest_id: u32, visibility: Visibility) -> Result<(), Error> {
+        let mut quest = Self::load_quest(&env, quest_id)?;
+        quest.owner.require_auth();
+
+        quest.visibility = visibility;
+        env.storage()
+            .persistent()
+            .set(&DataKey::Quest(quest_id), &quest);
+        Self::bump(&env, quest_id);
+        Ok(())
+    }
+
+    /// Get all public quests.
+    pub fn list_public_quests(env: Env) -> Vec<QuestInfo> {
+        let total_count: u32 = env.storage().instance().get(&DataKey::NextId).unwrap_or(0);
+        let mut public_quests = Vec::new(&env);
+
+        for i in 0..total_count {
+            if let Ok(quest) = Self::load_quest(&env, i) {
+                if quest.visibility == Visibility::Public {
+                    public_quests.push_back(quest);
+                }
+            }
+        }
+
+        env.storage().instance().extend_ttl(THRESHOLD, BUMP);
+        public_quests
     }
 
     // --- internals ---
