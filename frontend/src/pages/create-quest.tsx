@@ -583,11 +583,6 @@ interface QuestPreviewModalProps {
 }
 
 function QuestPreviewModal({ isOpen, onClose, questData }: QuestPreviewModalProps) {
-  // Get token metadata for formatting - MUST be before any conditional returns
-  const tokenAddress =
-    import.meta.env.VITE_REWARDS_TOKEN_CONTRACT_ID || import.meta.env.VITE_USDC_TOKEN_ADDRESS || ""
-  const { metadata: tokenMetadata } = useTokenMetadata(tokenAddress)
-
   // Handle ESC key to close modal
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -608,13 +603,6 @@ function QuestPreviewModal({ isOpen, onClose, questData }: QuestPreviewModalProp
 
   // Calculate total reward
   const totalReward = questData.milestones.reduce((sum: number, m) => sum + m.rewardAmount, 0)
-
-  // Format amounts with token metadata
-  const formatRewardAmount = (amount: number) => {
-    return tokenMetadata
-      ? formatTokens(amount, tokenMetadata.decimals, tokenMetadata.symbol)
-      : formatTokens(amount)
-  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -677,7 +665,7 @@ function QuestPreviewModal({ isOpen, onClose, questData }: QuestPreviewModalProp
                     </div>
                   </div>
                   <Badge variant="default" className="flex-shrink-0 tabular-nums">
-                    {formatRewardAmount(milestone.rewardAmount)}
+                    {milestone.rewardAmount} USDC
                   </Badge>
                 </div>
               ))}
@@ -685,14 +673,19 @@ function QuestPreviewModal({ isOpen, onClose, questData }: QuestPreviewModalProp
           </div>
 
           {/* Reward Pool */}
-          <div className="bg-primary border-border mb-4 flex items-center justify-between border-[2px] p-4 shadow-[3px_3px_0_var(--color-border)]">
-            <div className="flex items-center gap-2">
-              <Coins className="h-5 w-5" />
-              <span className="font-black">Total {tokenMetadata?.symbol || "USDC"} needed</span>
+          <div className="bg-primary border-border border-[2px] p-4">
+            <h4 className="text-muted-foreground mb-3 text-xs font-black tracking-wider uppercase">
+              Reward Pool
+            </h4>
+            <div className="bg-primary border-border mb-4 flex items-center justify-between border-[2px] p-4 shadow-[3px_3px_0_var(--color-border)]">
+              <div className="flex items-center gap-2">
+                <Coins className="h-5 w-5" />
+                <span className="font-black">Total USDC needed</span>
+              </div>
+              <span className="text-xl font-black tabular-nums">
+                {formatTokens(totalReward)} USDC
+              </span>
             </div>
-            <span className="text-xl font-black tabular-nums">
-              {formatRewardAmount(totalReward)}
-            </span>
           </div>
 
           {/* Action Buttons */}
@@ -738,11 +731,6 @@ function Step3Review({
   const [deadlineTxHash, setDeadlineTxHash] = useState<string | null>(null)
   const [fundTxHash, setFundTxHash] = useState<string | null>(null)
   const [showPreview, setShowPreview] = useState(false)
-
-  // Get token metadata for proper formatting
-  const tokenAddress =
-    import.meta.env.VITE_REWARDS_TOKEN_CONTRACT_ID || import.meta.env.VITE_USDC_TOKEN_ADDRESS || ""
-  const { metadata: tokenMetadata } = useTokenMetadata(tokenAddress)
 
   const totalReward = step2Data.milestones.reduce(
     (sum: number, m: z.infer<typeof milestoneSchema>) => sum + m.rewardAmount,
@@ -1040,7 +1028,7 @@ function Step3Review({
         <Button
           type="button"
           variant="outline"
-          onClick={() => setShowPreview(true)}
+          onClick={handlePreviewClose}
           className="shimmer-on-hover"
         >
           <Eye className="h-4 w-4" />
