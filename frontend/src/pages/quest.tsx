@@ -10,6 +10,7 @@ import {
   ChevronUp,
   Circle,
   Coins,
+  Check,
   Loader2,
   Lock,
   Plus,
@@ -214,7 +215,7 @@ export function QuestView() {
       enrolleesData.refetch(),
       poolBalanceData.refetch(),
     ])
-  }, [questData.refetch, milestonesData.refetch, enrolleesData.refetch, poolBalanceData.refetch])
+  }, [questData, milestonesData, enrolleesData, poolBalanceData])
 
   // Get raw data
   const quest = questData.data
@@ -258,16 +259,7 @@ export function QuestView() {
     }
 
     fetchCompletions()
-  }, [
-    questId,
-    milestones,
-    enrollees,
-    milestoneClient,
-    questData,
-    milestonesData,
-    enrolleesData,
-    poolBalanceData,
-  ])
+  }, [questId, milestones, enrollees])
 
   const isOwner = !!address && quest?.owner === address
   const isEnrolled = !!address && enrollees.includes(address)
@@ -929,7 +921,14 @@ export function QuestView() {
           <div className="bg-diagonal-lines pointer-events-none absolute inset-0 opacity-20" />
           <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h1 className="text-2xl font-black sm:text-3xl">{quest.name}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-black sm:text-3xl">{quest.name}</h1>
+                {quest.verified && (
+                  <Badge variant="verified" className="gap-1 border-black">
+                    <Check className="h-3 w-3" />
+                  </Badge>
+                )}
+              </div>
               <p className="text-muted-foreground mt-1 max-w-xl text-sm">{quest.description}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold">
                 <Badge variant={isExpired ? "outline" : "secondary"}>{deadlineLabel}</Badge>
