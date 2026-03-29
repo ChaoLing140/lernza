@@ -70,6 +70,8 @@ pub enum DataKey {
     ApprovalCount(u32, u32, Address), // (quest_id, milestone_id, enrollee)
     // Peer approvals tracking
     PeerApproval(u32, u32, Address, Address), // (quest_id, milestone_id, enrollee, peer)
+    // Total rewards reserved (verified + pending review) for a quest
+    TotalReservedReward(u32),
 }
 
 #[contracttype]
@@ -514,6 +516,16 @@ impl MilestoneContract {
             return Err(Error::AlreadyCompleted);
         }
 
+        // Increment total reserved reward if this completion wasn't already pending review
+        let submit_key = DataKey::PendingSubmission(quest_id, milestone_id, enrollee.clone());
+        if !env.storage().persistent().has(&submit_key) {
+            let reserved_key = DataKey::TotalReservedReward(quest_id);
+            let current_reserved: i128 = env.storage().persistent().get(&reserved_key).unwrap_or(0);
+            env.storage()
+                .persistent()
+                .set(&reserved_key, &(current_reserved + milestone.reward_amount));
+        }
+
         // Determine reward based on distribution mode
         let mode: DistributionMode = env
             .storage()
@@ -608,7 +620,7 @@ impl MilestoneContract {
 
         // Check if milestone exists
         let ms_key = DataKey::Milestone(quest_id, milestone_id);
-        let _: MilestoneInfo = env
+        let milestone: MilestoneInfo = env
             .storage()
             .persistent()
             .get(&ms_key)
@@ -645,6 +657,13 @@ impl MilestoneContract {
 
         // Mark as submitted for review
         env.storage().persistent().set(&submit_key, &true);
+
+        // Increment total reserved reward for pending review
+        let reserved_key = DataKey::TotalReservedReward(quest_id);
+        let current_reserved: i128 = env.storage().persistent().get(&reserved_key).unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&reserved_key, &(current_reserved + milestone.reward_amount));
         env.storage()
             .persistent()
             .extend_ttl(&submit_key, THRESHOLD, BUMP);
@@ -1115,6 +1134,14 @@ impl MilestoneContract {
         }
 
         Ok(())
+    }
+
+    /// Get total reserved reward (verified + pending review) for a quest.
+    pub fn get_total_reserved_reward(env: Env, quest_id: u32) -> i128 {
+        env.storage()
+            .persistent()
+            .get(&DataKey::TotalReservedReward(quest_id))
+            .unwrap_or(0)
     }
 
     /// Get total number of milestones for a quest

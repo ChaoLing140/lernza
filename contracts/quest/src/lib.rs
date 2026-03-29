@@ -203,6 +203,7 @@ impl QuestContract {
             visibility,
             status: QuestStatus::Active,
             deadline: 0,
+            archived_at: 0,
             max_enrollees,
             verified,
         };
@@ -319,6 +320,7 @@ impl QuestContract {
         quest.owner.require_auth();
 
         quest.status = QuestStatus::Archived;
+        quest.archived_at = env.ledger().timestamp();
 
         env.storage()
             .persistent()
