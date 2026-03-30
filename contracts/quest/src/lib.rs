@@ -792,7 +792,7 @@ impl QuestContract {
             .persistent()
             .get(&key)
             .unwrap_or(Vec::new(env));
-        if !ids.contains(&id) {
+        if !ids.contains(id) {
             ids.push_back(id);
             env.storage().persistent().set(&key, &ids);
         }
